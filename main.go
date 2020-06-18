@@ -4,27 +4,29 @@ import (
 	"context"
 	"log"
 	"net"
+	"shippy-service-consignment/proto/consignment"
 	"sync"
 
-	"github.com/go-kit/kit/transport/grpc"
-	pb "github.com/ryanyogan/shippy-service-consignment/proto/consignment"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
+
 const (
 	port = ":50051"
 )
 
 type repository interface {
-	Create(*pb.Consignment) (*pb.Consignment, error)
+	Create(*consignment.Consignment) (*consignment.Consignment, error)
 }
 
 // Repository - Memory repo, simulats a datastore
 type Repository struct {
-	mu sync.RWMutex
-	consignments []*pb.Consignment
+	mu           sync.RWMutex
+	consignments []*consignment.Consignment
 }
 
-func (repo *Repository) Create(consignment *pb.Consignment ) (*pb.Consignment, error) {
+// Create will create a consignment and return it, or return an error
+func (repo *Repository) Create(consignment *consignment.Consignment) (*consignment.Consignment, error) {
 	repo.mu.Lock()
 	defer repo.mu.Unlock()
 	updated := append(repo.consignments, consignment)
@@ -37,13 +39,13 @@ type service struct {
 	repo repository
 }
 
-func (s *service) CreateConsignment(ctx context.Context, req *pb.Consignment) (*pb.Response, error) {
+func (s *service) CreateConsignment(ctx context.Context, req *consignment.Consignment) (*consignment.Response, error) {
 	consignment, err := s.repo.Create(req)
 	if err != nil {
-		return nil, error
+		return nil, err
 	}
 
-	return *pb.Response{Created: true, Consignment: consignment}, nil
+	return &consignment.Response{Created: true, Consignment: consignment}, nil
 }
 
 func main() {
@@ -55,7 +57,7 @@ func main() {
 	}
 	s := grpc.NewServer()
 
-	pb.RegisterShippingServiceServer(s, &service{repo})
+	consignment.RegisterShippingServiceServer(s, &service{repo})
 	reflection.Register(s)
 
 	log.Println("Running on port: ", port)
